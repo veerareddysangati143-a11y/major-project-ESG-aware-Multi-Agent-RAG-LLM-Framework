@@ -35,7 +35,7 @@ from evaluation import compute_framework_evaluation_metrics
 from feedback import FeedbackLoopEngine
 from database import DatabaseManager
 from utils.constants import AgentName
-from llm import answer_user_question
+from assistant import answer_user_question
 
 # Streamlit Page Setup
 st.set_page_config(
