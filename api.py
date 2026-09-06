@@ -91,6 +91,7 @@ def analyze(request: AnalysisRequest) -> Dict:
             "score": float(consensus.score),
             "confidence": float(consensus.confidence),
             "explanation": explanation.evidence[0] if explanation.evidence else "",
+            "explanation_details": explanation.metadata,
             "agents": [result.to_dict() for result in output["results"]],
             "consensus_breakdown": consensus.metadata.get("breakdown", []),
             "regime": consensus.metadata.get("regime", {}),

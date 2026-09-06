@@ -65,6 +65,10 @@ class DatabaseManager:
                     category TEXT,
                     chunk_text TEXT,
                     embedding_json TEXT,
+                    source TEXT,
+                    publication_date TEXT,
+                    document_type TEXT,
+                    ticker TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -96,6 +100,18 @@ class DatabaseManager:
             """)
 
             conn.commit()
+
+            cursor.execute("PRAGMA table_info(documents_rag)")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            for column, definition in {
+                "source": "TEXT",
+                "publication_date": "TEXT",
+                "document_type": "TEXT",
+                "ticker": "TEXT",
+            }.items():
+                if column not in existing_columns:
+                    cursor.execute(f"ALTER TABLE documents_rag ADD COLUMN {column} {definition}")
+            conn.commit()
             
         # Seed initial ESG & SEC documents if database is empty
         self.seed_default_documents()
@@ -107,16 +123,16 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM documents_rag")
             if cursor.fetchone()[0] == 0:
                 defaults = [
-                    ("Sustainability Report 2024", "ESG Reports", "Company reduced carbon emissions by 25% year-over-year. Energy grid uses 40% renewable solar power across manufacturing facilities."),
-                    ("SEC EDGAR 10-K Filing", "SEC EDGAR", "Annual Report 10-K: Independent audit committee established with strict ethical compliance and transparency policies."),
-                    ("World Bank Macro Report", "World Bank", "Macroeconomic forecast predicts stable inflation rates and high growth momentum in industrial production."),
-                    ("Reuters Financial News", "News", "Quarterly earnings beat market expectations by 8.5%, driven by record revenue growth and expansion.")
+                    ("Sustainability Report 2024", "ESG Reports", "Company reduced carbon emissions by 25% year-over-year. Energy grid uses 40% renewable solar power across manufacturing facilities.", "Reliance Industries Sustainability Report 2023-24", "2024-03-31", "ESG report", "RELIANCE.NS"),
+                    ("SEC EDGAR 10-K Filing", "SEC EDGAR", "Annual Report 10-K: Independent audit committee established with strict ethical compliance and transparency policies.", "SEC EDGAR 10-K Filing", None, "Regulatory filing", None),
+                    ("World Bank Macro Report", "World Bank", "Macroeconomic forecast predicts stable inflation rates and high growth momentum in industrial production.", "World Bank Macro Report", None, "Macro report", None),
+                    ("Reuters Financial News", "News", "Quarterly earnings beat market expectations by 8.5%, driven by record revenue growth and expansion.", "Reuters Financial News", None, "News", None)
                 ]
-                for title, cat, text in defaults:
+                for title, cat, text, source, publication_date, document_type, ticker in defaults:
                     vec = self._compute_dummy_embedding(text)
                     cursor.execute(
-                        "INSERT INTO documents_rag (doc_title, category, chunk_text, embedding_json) VALUES (?, ?, ?, ?)",
-                        (title, cat, text, json.dumps(vec))
+                        "INSERT INTO documents_rag (doc_title, category, chunk_text, embedding_json, source, publication_date, document_type, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (title, cat, text, json.dumps(vec), source, publication_date, document_type, ticker)
                     )
                 conn.commit()
 
@@ -151,14 +167,14 @@ class DatabaseManager:
                     continue
             conn.commit()
 
-    def add_document(self, doc_title: str, category: str, text: str):
+    def add_document(self, doc_title: str, category: str, text: str, source: str = "User-provided context", publication_date: str = None, document_type: str = "Context", ticker: str = None):
         """Adds a document chunk to the vector store database."""
         vec = self._compute_dummy_embedding(text)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO documents_rag (doc_title, category, chunk_text, embedding_json) VALUES (?, ?, ?, ?)",
-                (doc_title, category, text, json.dumps(vec))
+                "INSERT INTO documents_rag (doc_title, category, chunk_text, embedding_json, source, publication_date, document_type, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (doc_title, category, text, json.dumps(vec), source, publication_date, document_type, ticker)
             )
             conn.commit()
 
@@ -168,11 +184,11 @@ class DatabaseManager:
         
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, doc_title, category, chunk_text, embedding_json FROM documents_rag")
+            cursor.execute("SELECT id, doc_title, category, chunk_text, embedding_json, source, publication_date, document_type, ticker FROM documents_rag")
             rows = cursor.fetchall()
             
         results = []
-        for r_id, title, cat, text, vec_json in rows:
+        for r_id, title, cat, text, vec_json, source, publication_date, document_type, ticker in rows:
             doc_vec = np.array(json.loads(vec_json))
             similarity = float(np.dot(query_vec, doc_vec))
             results.append({
@@ -181,6 +197,10 @@ class DatabaseManager:
                 "category": cat,
                 "text": text,
                 "similarity_score": similarity
+                ,"source": source or "Unspecified source",
+                "publication_date": publication_date,
+                "document_type": document_type or cat,
+                "ticker": ticker
             })
             
         results.sort(key=lambda x: x["similarity_score"], reverse=True)

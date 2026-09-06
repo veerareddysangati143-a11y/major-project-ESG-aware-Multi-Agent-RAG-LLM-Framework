@@ -34,6 +34,9 @@ class LLMDecisionAgent(BaseAgent):
                 "provider": output["provider"],
                 "model_version": output["model_version"],
                 "evidence_grounded": output["evidence_grounded"],
-                "esg_aligned": output["esg_aligned"]
+                "esg_aligned": output["esg_aligned"],
+                "supporting_evidence": output["supporting_evidence"],
+                "key_risks": output["key_risks"],
+                "reasoning_factors": output["reasoning_factors"]
             }
         )

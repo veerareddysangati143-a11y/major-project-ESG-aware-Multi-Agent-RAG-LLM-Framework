@@ -22,8 +22,7 @@ class RAGKnowledgeAgent(BaseAgent):
         
         result = build_and_query_rag(documents, query, top_k=3)
         retrieved = result["retrieved_chunks"]
-        
-        evidence = retrieved if retrieved else ["No local ESG or filing documents were indexed."]
+        evidence = retrieved if result["evidence_status"] == "Sufficient evidence" else ["Insufficient evidence: retrieval relevance or coverage was below the configured threshold."]
         
         return AgentResult(
             agent_name=self.name,
@@ -36,6 +35,9 @@ class RAGKnowledgeAgent(BaseAgent):
                 "retrieved_chunks_count": len(retrieved),
                 "top_k": result["top_k"],
                 "query": query,
-                "analysis": "Retrieved evidence is supplied to the decision agent for grounded reasoning."
+                "analysis": "Retrieved evidence is supplied to the decision agent for grounded reasoning.",
+                "evidence_quality": result["evidence_quality"],
+                "evidence_status": result["evidence_status"],
+                "search_details": result["search_details"]
             }
         )

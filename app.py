@@ -370,9 +370,13 @@ with tabs[1]:
         rag_res = next((r for r in results if r.agent_name == AgentName.RAG.value), None)
         if rag_res:
             st.write("**User query:**", rag_res.metadata.get("query", "ESG sustainability, regulatory compliance, and risk"))
+            st.metric("Evidence quality", f"{rag_res.metadata.get('evidence_quality', 0.0):.0%}")
+            st.caption(rag_res.metadata.get("evidence_status", "Evidence status unavailable"))
         if rag_res and rag_res.evidence:
             for idx, chunk in enumerate(rag_res.evidence, 1):
                 st.info(f"**Retrieved Chunk #{idx}**:\n{chunk}")
+            if rag_res.metadata.get("search_details"):
+                st.dataframe(pd.DataFrame(rag_res.metadata["search_details"]), use_container_width=True)
         else:
             st.warning("No RAG chunks retrieved.")
 
@@ -436,6 +440,12 @@ with tabs[3]:
     with de_col2:
         st.markdown("### LLM Decision Agent (Llama 3 / FinGPT)")
         st.success(f"**Final LLM Rationale:**\n\n{explanation.evidence[0]}")
+        st.markdown("**Reasoning factors**")
+        st.write(explanation.metadata.get("reasoning_factors", []))
+        st.markdown("**Key risks**")
+        st.write(explanation.metadata.get("key_risks", []))
+        st.markdown("**Supporting evidence**")
+        st.write(explanation.metadata.get("supporting_evidence", []))
         st.json(explanation.metadata)
 
 # --------------------------------------------------------------------------------------

@@ -20,6 +20,20 @@ def generate_llm_decision(consensus_result: Dict[str, Any], agent_outputs: List[
         agent_summaries.append(f"{name}: Signal {sig} (Score {sc:+.2f})")
         
     summary_text = "; ".join(agent_summaries)
+    reasoning_factors = [
+        f"{getattr(res, 'agent_name', 'Agent')}: {getattr(res, 'signal', 'NEUTRAL')} with score {float(getattr(res, 'score', 0.0)):+.2f}"
+        for res in agent_outputs
+        if getattr(res, "agent_name", "") not in {"RAG Knowledge Agent", "Market Regime Agent"}
+    ]
+    key_risks = []
+    for res in agent_outputs:
+        if "risk" in getattr(res, "agent_name", "").lower():
+            key_risks.extend(getattr(res, "evidence", [])[:3])
+    supporting_evidence = [
+        item.strip()
+        for item in rag_context.split("\n---\n")
+        if item.strip() and not item.strip().lower().startswith("insufficient evidence")
+    ]
     
     rationale = (
         f"Llama3/FinGPT Synthesis: Final recommendation is {rec} (Score: {score:+.2f}, Confidence: {conf:.0%}). "
@@ -35,8 +49,11 @@ def generate_llm_decision(consensus_result: Dict[str, Any], agent_outputs: List[
         "rationale": rationale,
         "provider": "Llama 3 / FinGPT (Local Engine)",
         "model_version": "llama3:8b-instruct-q4",
-        "evidence_grounded": True,
-        "esg_aligned": True
+        "evidence_grounded": bool(supporting_evidence),
+        "esg_aligned": True,
+        "supporting_evidence": supporting_evidence,
+        "key_risks": key_risks,
+        "reasoning_factors": reasoning_factors,
     }
 
 
