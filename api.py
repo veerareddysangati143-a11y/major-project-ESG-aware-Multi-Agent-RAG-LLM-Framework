@@ -52,7 +52,7 @@ def analyze(request: AnalysisRequest) -> Dict:
         from agents.orchestrator import MultiAgentOrchestrator
         from data_collector import get_stock_data
         from technical import compute_technical_indicators
-        from evaluation import compute_framework_evaluation_metrics
+        from evaluation import compute_framework_evaluation_metrics, compute_model_comparison, compute_ablation_study, compute_backtest_results
 
         raw_data = get_stock_data(
             request.ticker,
@@ -76,6 +76,9 @@ def analyze(request: AnalysisRequest) -> Dict:
         consensus = output["consensus"]
         explanation = output["explanation"]
         evaluation = compute_framework_evaluation_metrics(processed_data)
+        model_comparison = compute_model_comparison(processed_data)
+        ablation = compute_ablation_study(processed_data)
+        backtest = compute_backtest_results(processed_data)
 
         return {
             "ticker": context["ticker"],
@@ -97,6 +100,9 @@ def analyze(request: AnalysisRequest) -> Dict:
             "regime": consensus.metadata.get("regime", {}),
             "confidence_details": consensus.metadata.get("confidence_details", {}),
             "evaluation": evaluation,
+            "model_comparison": model_comparison,
+            "ablation": ablation,
+            "backtest": backtest,
         }
     except HTTPException:
         raise

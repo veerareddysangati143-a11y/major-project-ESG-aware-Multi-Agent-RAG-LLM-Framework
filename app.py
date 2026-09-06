@@ -31,7 +31,7 @@ from config import RAW_DATA_DIR, MODEL_BENCHMARKS
 from data_collector import get_stock_data
 from agents.orchestrator import MultiAgentOrchestrator
 from technical import compute_technical_indicators
-from evaluation import compute_framework_evaluation_metrics
+from evaluation import compute_framework_evaluation_metrics, compute_model_comparison, compute_ablation_study, compute_backtest_results
 from feedback import FeedbackLoopEngine
 from database import DatabaseManager
 from utils.constants import AgentName
@@ -230,6 +230,9 @@ results = pipeline_output["results"]
 consensus = pipeline_output["consensus"]
 explanation = pipeline_output["explanation"]
 metrics_data = compute_framework_evaluation_metrics(processed_data)
+model_comparison = compute_model_comparison(processed_data)
+ablation_data = compute_ablation_study(processed_data)
+backtest_data = compute_backtest_results(processed_data)
 rec_signal = consensus.metadata.get("recommendation", "HOLD")
 regime_data = consensus.metadata.get("regime", {})
 confidence_details = consensus.metadata.get("confidence_details", {})
@@ -494,6 +497,10 @@ with tabs[4]:
     ]
     st.dataframe(pd.DataFrame(model_rows), use_container_width=True)
 
+    st.markdown("#### Runtime Model Comparison")
+    st.caption("These metrics use the same chronological holdout. Models without runtime artifacts are reported as unavailable.")
+    st.dataframe(pd.DataFrame(model_comparison["rows"]), use_container_width=True)
+
     st.markdown("#### Actual Price vs Predicted Price")
     evaluation_rows = pd.DataFrame(metrics_data["actual_vs_predicted"])
     st.dataframe(evaluation_rows, use_container_width=True)
@@ -503,6 +510,14 @@ with tabs[4]:
         evaluation_fig.add_trace(go.Scatter(x=evaluation_rows["actual_date"], y=evaluation_rows["predicted_close"], name="Predicted Close"))
         evaluation_fig.update_layout(title="Holdout Evaluation: Actual vs Predicted Close", height=350, template="plotly_white")
         st.plotly_chart(evaluation_fig, use_container_width=True)
+
+    st.markdown("#### Historical Backtesting")
+    st.caption("Each position uses only the historical prefix available before the next trading day; no future price is used for the signal.")
+    st.dataframe(pd.DataFrame(backtest_data["rows"]), use_container_width=True)
+
+    st.markdown("#### Ablation Study")
+    st.caption("Sentiment, ESG, and RAG ablations remain pending because time-aligned historical streams are not currently available.")
+    st.dataframe(pd.DataFrame(ablation_data["rows"]), use_container_width=True)
 
     esg_result = next((r for r in results if r.agent_name == AgentName.ESG.value), None)
     if esg_result:
