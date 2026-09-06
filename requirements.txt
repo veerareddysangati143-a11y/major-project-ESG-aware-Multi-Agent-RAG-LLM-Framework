@@ -1,38 +1,10 @@
-# Core data science & visualization
-pandas>=2.0.0
-numpy>=1.24.0
-matplotlib>=3.7.0
-plotly>=5.14.0
-scikit-learn>=1.2.0
-scipy>=1.10.0
+# Streamlit dashboard runtime
+streamlit>=1.41,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+plotly>=5.24,<7
+yfinance>=0.2.50,<2
+python-dotenv>=1.0,<2
 
-# Financial stock data
-yfinance>=0.2.28
-
-# Machine Learning & Deep Learning
-tensorflow>=2.15.0,<2.17.0
-neuralprophet>=0.9.0
-
-# Technical analysis
-ta>=0.11.0
-
-# Natural Language Processing & Transformers
-transformers>=4.30.0
-torch>=2.0.0
-sentence-transformers>=2.2.2
-faiss-cpu>=1.7.4
-
-# Document loaders & parsers
-pypdf>=3.9.0
-python-docx>=0.8.11
-
-# Web Framework
-streamlit>=1.25.0
-fastapi>=0.115.0
-uvicorn>=0.30.0
-
-# Environment & Utilities
-python-dotenv>=1.0.0
-requests>=2.31.0
-pytest>=8.0.0
-ipykernel>=6.29.0
+# Local validation only; harmless on Streamlit Cloud
+pytest>=8,<9
