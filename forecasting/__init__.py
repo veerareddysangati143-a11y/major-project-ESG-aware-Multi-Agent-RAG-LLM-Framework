@@ -12,25 +12,30 @@ def predict_stock_trend(data: pd.DataFrame, horizon: int = 5) -> Dict[str, Any]:
     """
     Predict stock price movement and trend using GRU/LSTM ensemble & trend fitting.
     """
-    close = data["Close"].values
+    close = data["Close"].astype(float).to_numpy()
     if len(close) < 20:
-        return {"projected_return": 0.0, "score": 0.0, "model_metrics": {"MAE": 0.0304, "RMSE": 0.0397, "R2": 0.9755}}
-    
-    window = min(50, len(close))
-    recent_close = close[-window:]
-    x = np.arange(window)
-    slope, intercept = np.polyfit(x, recent_close, 1)
+        return {
+            "projected_return": 0.0,
+            "score": 0.0,
+            "prediction_method": "Insufficient history",
+            "model_metrics_source": "Notebook benchmark reference",
+        }
     
     current_price = close[-1]
-    projected_price = current_price + (slope * horizon)
-    projected_return = float((projected_price - current_price) / current_price)
-    
-    # GRU / LSTM ensemble prediction simulation based on R2 calibration
-    ema_short = pd.Series(close).ewm(span=12).mean().iloc[-1]
-    ema_long = pd.Series(close).ewm(span=26).mean().iloc[-1]
-    momentum = (ema_short - ema_long) / current_price
-    
-    ensemble_score = float(np.clip(projected_return * 15 + momentum * 10, -1.0, 1.0))
+    log_close = np.log(np.maximum(close, 1e-9))
+    long_window = min(60, len(close))
+    short_window = min(20, len(close))
+    long_slope = np.polyfit(np.arange(long_window), log_close[-long_window:], 1)[0]
+    short_slope = np.polyfit(np.arange(short_window), log_close[-short_window:], 1)[0]
+    trend_return = 0.6 * long_slope * horizon + 0.4 * short_slope * horizon
+
+    ema_short = pd.Series(close).ewm(span=12, adjust=False).mean().iloc[-1]
+    ema_long = pd.Series(close).ewm(span=26, adjust=False).mean().iloc[-1]
+    momentum_return = float(np.log(max(ema_short, 1e-9) / max(ema_long, 1e-9)))
+    projected_log_return = float(np.clip(trend_return + 0.35 * momentum_return * horizon, -0.20, 0.20))
+    projected_price = float(current_price * np.exp(projected_log_return))
+    projected_return = float(np.exp(projected_log_return) - 1.0)
+    ensemble_score = float(np.clip(projected_return * 8.0 + momentum_return * 4.0, -1.0, 1.0))
     
     return {
         "current_price": float(current_price),
@@ -38,6 +43,10 @@ def predict_stock_trend(data: pd.DataFrame, horizon: int = 5) -> Dict[str, Any]:
         "projected_return": projected_return,
         "score": ensemble_score,
         "horizon_days": horizon,
+        "prediction_method": "60-day/20-day log-price trend with EMA momentum",
+        "trend_return": float(np.exp(trend_return) - 1.0),
+        "momentum_return": momentum_return,
+        "model_metrics_source": "Notebook benchmark reference; not recalculated in this runtime",
         "model_benchmarks": {
             "GRU": {"MAE": 0.030419, "RMSE": 0.039738, "R2": 0.975537, "Accuracy": 88.10},
             "BiLSTM": {"MAE": 0.037912, "RMSE": 0.048852, "R2": 0.963028, "Accuracy": 81.77},

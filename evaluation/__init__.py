@@ -15,7 +15,9 @@ def compute_framework_evaluation_metrics(data: pd.DataFrame) -> Dict[str, Any]:
     actual = data.iloc[-horizon:].copy()
     prediction = predict_stock_trend(train, horizon=horizon)
     last_price = float(train["Close"].iloc[-1])
-    predicted_prices = np.linspace(last_price, prediction["projected_price"], horizon + 1)[1:]
+    predicted_prices = last_price * np.exp(
+        np.linspace(0.0, np.log(max(prediction["projected_price"], 1e-9) / last_price), horizon + 1)[1:]
+    )
     actual_prices = actual["Close"].to_numpy(dtype=float)
     errors = actual_prices - predicted_prices
     actual_returns = actual_prices / last_price - 1.0

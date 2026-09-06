@@ -26,7 +26,7 @@ class MarketForecastingAgent(BaseAgent):
             f"Current Price: {prediction['current_price']:.2f}",
             f"5-Day Projected Price: {prediction['projected_price']:.2f}",
             f"Projected Return: {prediction['projected_return']:.2%}",
-            f"GRU R2: 97.55% | Accuracy: 88.10%"
+            f"Method: {prediction.get('prediction_method', 'trend projection')}"
         ]
         
         return AgentResult(

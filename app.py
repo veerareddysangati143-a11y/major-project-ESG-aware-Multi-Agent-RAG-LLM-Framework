@@ -165,6 +165,24 @@ with st.sidebar:
     w_sentiment = st.slider("News Sentiment Weight", 0.0, 1.0, 0.15, 0.05)
     w_esg = st.slider("ESG Factor Weight", 0.0, 1.0, 0.25, 0.05)
     w_risk = st.slider("Risk Assessment Weight", 0.0, 1.0, 0.15, 0.05)
+
+    weight_values = {
+        "Market Forecast": w_forecast,
+        "Technical Analysis": w_technical,
+        "News Sentiment": w_sentiment,
+        "ESG Factor": w_esg,
+        "Risk Assessment": w_risk,
+    }
+    weight_total = sum(weight_values.values()) or 1.0
+    st.caption("Normalized voting weights")
+    st.dataframe(
+        pd.DataFrame([
+            {"Agent": name, "Configured": value, "Normalized": value / weight_total}
+            for name, value in weight_values.items()
+        ]),
+        hide_index=True,
+        use_container_width=True,
+    )
     
     run_btn = st.button("🚀 Run Multi-Agent Framework", type="primary", use_container_width=True)
 
@@ -401,9 +419,9 @@ with tabs[4]:
         st.dataframe(pd.DataFrame([metrics_data["trading_metrics"]]), use_container_width=True)
 
     st.markdown("#### Model Performance Reference")
-    st.caption("The holdout metrics above are calculated from the current dataset. These model rows are recorded benchmark results used by the forecasting ensemble.")
+    st.caption("The holdout metrics above are calculated from the current dataset. The table below contains recorded notebook benchmark results and is labelled separately from the live holdout evaluation.")
     model_rows = [
-        {"Model": model_name, "Accuracy": values["Accuracy"], "RMSE": values["RMSE"], "MAE": values["MAE"]}
+        {"Model": model_name, "Accuracy": values["Accuracy"], "RMSE": values["RMSE"], "MAE": values["MAE"], "R2": values["R2"], "Source": "Notebook benchmark"}
         for model_name, values in MODEL_BENCHMARKS.items()
     ]
     st.dataframe(pd.DataFrame(model_rows), use_container_width=True)

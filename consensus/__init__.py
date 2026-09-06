@@ -71,7 +71,7 @@ def compute_weighted_consensus(agent_results: List[Any], custom_weights: Dict[st
         "recommendation": recommendation,
         "consensus_score": final_score,
         "confidence": final_confidence,
-        "total_agents": len(valid_results),
+        "total_agents": len(breakdown),
         "breakdown": breakdown,
         "normalized_weights": normalized_weights
     }
