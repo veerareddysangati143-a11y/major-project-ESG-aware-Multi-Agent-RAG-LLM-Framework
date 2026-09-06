@@ -6,17 +6,24 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from agents.orchestrator import MultiAgentOrchestrator
-from data_collector import get_stock_data
-from technical import compute_technical_indicators
-from evaluation import compute_framework_evaluation_metrics
-
 
 app = FastAPI(
     title="ESG Multi-Agent Stock Analysis API",
     version="1.0.0",
     description="JSON API for explainable stock signals and ESG-aware consensus analysis.",
 )
+
+
+@app.get("/")
+def root() -> Dict[str, str]:
+    """Return API links without importing the heavy analysis pipeline."""
+    return {
+        "service": "esg-multi-agent-stock-api",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+        "analysis": "/analyze",
+    }
 
 
 class AnalysisRequest(BaseModel):
@@ -41,11 +48,17 @@ def analyze(request: AnalysisRequest) -> Dict:
         raise HTTPException(status_code=400, detail="start_date must be before end_date")
 
     try:
+        # Keep cold-start health requests lightweight and load the pipeline only when used.
+        from agents.orchestrator import MultiAgentOrchestrator
+        from data_collector import get_stock_data
+        from technical import compute_technical_indicators
+        from evaluation import compute_framework_evaluation_metrics
+
         raw_data = get_stock_data(
             request.ticker,
             request.start_date.isoformat(),
             request.end_date.isoformat(),
-            save_raw=True,
+            save_raw=False,
         )
         processed_data = compute_technical_indicators(raw_data).dropna(
             subset=["SMA 50", "RSI"]

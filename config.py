@@ -15,15 +15,17 @@ load_dotenv()
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
 
-DATA_DIR = BASE_DIR / "data"
-RAW_DATA_DIR = DATA_DIR / "raw"
-PROCESSED_DATA_DIR = DATA_DIR / "processed"
-NEWS_DATA_DIR = DATA_DIR / "news"
-ESG_DATA_DIR = DATA_DIR / "esg"
-REPORTS_DATA_DIR = DATA_DIR / "reports"
-VECTOR_DB_DIR = DATA_DIR / "vector_db"
+IS_SERVERLESS = bool(os.getenv("VERCEL"))
+RUNTIME_DATA_DIR = Path("/tmp/esg_multi_agent_stock_system") if IS_SERVERLESS else BASE_DIR / "data"
+DATA_DIR = RUNTIME_DATA_DIR
+RAW_DATA_DIR = BASE_DIR / "data" / "raw"
+PROCESSED_DATA_DIR = RUNTIME_DATA_DIR / "processed"
+NEWS_DATA_DIR = RUNTIME_DATA_DIR / "news"
+ESG_DATA_DIR = BASE_DIR / "data" / "esg"
+REPORTS_DATA_DIR = RUNTIME_DATA_DIR / "reports"
+VECTOR_DB_DIR = RUNTIME_DATA_DIR / "vector_db"
 
-MODELS_DIR = BASE_DIR / "models"
+MODELS_DIR = Path("/tmp/esg_multi_agent_models") if IS_SERVERLESS else BASE_DIR / "models"
 LSTM_MODEL_DIR = MODELS_DIR / "lstm"
 GRU_MODEL_DIR = MODELS_DIR / "gru"
 BILSTM_MODEL_DIR = MODELS_DIR / "bilstm"
