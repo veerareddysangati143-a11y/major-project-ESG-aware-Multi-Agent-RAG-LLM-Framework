@@ -201,6 +201,17 @@ On the same Wi-Fi/network, replace `localhost` with the host computer's IPv4 add
 
 To make the API public, expose port `8000` through Cloudflare Tunnel or deploy the project to a cloud host. A LAN URL such as `http://10.x.x.x:8000` cannot work on a phone using mobile data.
 
+### Vercel deployment
+
+Vercel is configured to deploy the FastAPI service from `api:app` using `pyproject.toml`. After deployment, use:
+
+```text
+https://YOUR-VERCEL-DOMAIN/health
+https://YOUR-VERCEL-DOMAIN/docs
+```
+
+The Streamlit dashboard in `app.py` should be deployed separately on a Streamlit-compatible host.
+
 ---
 
 ## ⚠️ Research & Safety Disclaimer
