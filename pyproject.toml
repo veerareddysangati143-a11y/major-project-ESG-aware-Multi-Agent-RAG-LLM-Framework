@@ -1,2 +1,14 @@
+[project]
+name = "esg-multi-agent-stock-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+	"fastapi>=0.115.0",
+	"numpy>=1.24.0",
+	"pandas>=2.0.0",
+	"python-dotenv>=1.0.0",
+	"yfinance>=0.2.28"
+]
+
 [tool.vercel]
 entrypoint = "api:app"
