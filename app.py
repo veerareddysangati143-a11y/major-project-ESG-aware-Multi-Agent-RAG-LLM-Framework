@@ -231,6 +231,8 @@ consensus = pipeline_output["consensus"]
 explanation = pipeline_output["explanation"]
 metrics_data = compute_framework_evaluation_metrics(processed_data)
 rec_signal = consensus.metadata.get("recommendation", "HOLD")
+regime_data = consensus.metadata.get("regime", {})
+confidence_details = consensus.metadata.get("confidence_details", {})
 
 agent_by_name = {result.agent_name: result for result in results}
 forecast_result = agent_by_name.get(AgentName.FORECASTING.value)
@@ -266,6 +268,11 @@ m2.metric("Consensus Signal", rec_signal)
 m3.metric("Confidence Score", f"{consensus.confidence:.0%}")
 m4.metric("RSI (14)", f"{latest_row['RSI']:.1f}")
 m5.metric("Database Entries", sum(db.get_all_table_counts().values()))
+st.caption(
+    f"Market regime: {regime_data.get('regime', 'UNKNOWN')} | "
+    f"Regime confidence: {regime_data.get('confidence', 0.0):.0%} | "
+    f"Volatility: {regime_data.get('volatility', 0.0):.2%}"
+)
 
 st.markdown("---")
 
@@ -411,6 +418,17 @@ with tabs[3]:
         breakdown_data = consensus.metadata.get("breakdown", [])
         if breakdown_data:
             st.dataframe(pd.DataFrame(breakdown_data), use_container_width=True)
+            st.write(
+                f"Agent agreement: {confidence_details.get('agent_agreement', 0.0):.0%} | "
+                f"Disagreement: {confidence_details.get('disagreement', 1.0):.0%}"
+            )
+            st.json({
+                "consensus_strength": confidence_details.get("consensus_strength", 0.0),
+                "forecast_reliability": confidence_details.get("forecast_reliability", 0.0),
+                "evidence_quality": confidence_details.get("evidence_quality", 0.0),
+                "risk_adjustment": confidence_details.get("risk_adjustment", 0.0),
+                "final_confidence": confidence_details.get("confidence", consensus.confidence),
+            })
         else:
             st.write("Consensus Score:", f"{consensus.score:+.3f}")
             st.write("Confidence:", f"{consensus.confidence:.0%}")

@@ -9,6 +9,7 @@ import pandas as pd
 from agents import AgentResult, BaseAgent
 from utils.constants import AgentName, SignalType
 from utils.helpers import numeric_to_signal
+from regime_detection import detect_market_regime
 
 
 def _data(context: Dict[str, Any]) -> pd.DataFrame:
@@ -115,19 +116,22 @@ class RegimeAgent(BaseAgent):
         super().__init__(AgentName.REGIME)
 
     def analyze(self, context):
-        data = _data(context)
-        volatility = float(data["Daily_Return"].tail(20).std() * np.sqrt(252))
-        slope = float(data["Close"].tail(50).iloc[-1] / data["Close"].tail(50).iloc[0] - 1)
-        if volatility > 0.45:
-            regime = "HIGH_VOLATILITY"
-        elif slope > 0.08:
-            regime = "BULL"
-        elif slope < -0.08:
-            regime = "BEAR"
-        else:
-            regime = "SIDEWAYS"
-        score = {"BULL": 1.0, "BEAR": -1.0, "SIDEWAYS": 0.0, "HIGH_VOLATILITY": 0.0}[regime]
-        return AgentResult(self.name, regime, score, 0.7, [f"Regime: {regime}", f"50-session return: {slope:.2%}", f"20-session annualized volatility: {volatility:.2%}"], {"regime": regime})
+        result = detect_market_regime(_data(context))
+        regime = result["regime"]
+        score = {"BULL": 1.0, "BEAR": -1.0, "SIDEWAYS": 0.0, "HIGH_VOLATILITY": 0.0}.get(regime, 0.0)
+        return AgentResult(
+            self.name,
+            regime,
+            score,
+            result["confidence"],
+            [
+                f"Regime: {regime}",
+                f"50-session trend strength: {result['trend_strength']:.2%}",
+                f"20-session annualized volatility: {result['volatility']:.2%}",
+                f"Current drawdown: {result['drawdown']:.2%}",
+            ],
+            result,
+        )
 
 
 class LLMDecisionAgent(BaseAgent):

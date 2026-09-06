@@ -19,7 +19,11 @@ class WeightedConsensusEngine(BaseAgent):
         results = context.get("results", [])
         custom_weights = context.get("weights", None)
         
-        consensus_output = compute_weighted_consensus(results, custom_weights)
+        consensus_output = compute_weighted_consensus(
+            results,
+            custom_weights,
+            context.get("regime", {}),
+        )
         rec_str = consensus_output["recommendation"]
         signal = SignalType.BUY if rec_str == "BUY" else SignalType.SELL if rec_str == "SELL" else SignalType.HOLD
         
@@ -39,6 +43,9 @@ class WeightedConsensusEngine(BaseAgent):
             metadata={
                 "recommendation": rec_str,
                 "breakdown": consensus_output["breakdown"],
-                "custom_weights": custom_weights
+                "custom_weights": custom_weights,
+                "normalized_weights": consensus_output["normalized_weights"],
+                "confidence_details": consensus_output["confidence_details"],
+                "regime": consensus_output["regime"],
             }
         )

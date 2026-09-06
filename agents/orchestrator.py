@@ -50,11 +50,13 @@ class MultiAgentOrchestrator:
         # 2. Extract RAG context
         rag_res = next((r for r in results if r.agent_name == AgentName.RAG.value), None)
         rag_context = "\n".join(rag_res.evidence) if rag_res else ""
+        regime_res = next((r for r in results if r.agent_name == AgentName.REGIME.value), None)
         
         # 3. Decision Engine: Weighted Consensus Engine
         consensus_context = {
             "results": results,
-            "weights": custom_weights
+            "weights": custom_weights,
+            "regime": regime_res.metadata if regime_res else {}
         }
         consensus_result = self.consensus_engine.run(consensus_context)
         
@@ -64,7 +66,9 @@ class MultiAgentOrchestrator:
             "consensus_data": {
                 "recommendation": consensus_result.metadata.get("recommendation", "HOLD"),
                 "consensus_score": consensus_result.score,
-                "confidence": consensus_result.confidence
+                "confidence": consensus_result.confidence,
+                "confidence_details": consensus_result.metadata.get("confidence_details", {}),
+                "regime": consensus_result.metadata.get("regime", {})
             },
             "rag_context": rag_context
         }

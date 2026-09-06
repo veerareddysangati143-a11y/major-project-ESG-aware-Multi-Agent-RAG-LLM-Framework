@@ -93,6 +93,8 @@ def analyze(request: AnalysisRequest) -> Dict:
             "explanation": explanation.evidence[0] if explanation.evidence else "",
             "agents": [result.to_dict() for result in output["results"]],
             "consensus_breakdown": consensus.metadata.get("breakdown", []),
+            "regime": consensus.metadata.get("regime", {}),
+            "confidence_details": consensus.metadata.get("confidence_details", {}),
             "evaluation": evaluation,
         }
     except HTTPException:
