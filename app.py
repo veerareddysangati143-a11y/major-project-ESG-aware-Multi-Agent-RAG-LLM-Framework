@@ -35,6 +35,7 @@ from evaluation import compute_framework_evaluation_metrics
 from feedback import FeedbackLoopEngine
 from database import DatabaseManager
 from utils.constants import AgentName
+from llm import answer_user_question
 
 # Streamlit Page Setup
 st.set_page_config(
@@ -229,9 +230,26 @@ results = pipeline_output["results"]
 consensus = pipeline_output["consensus"]
 explanation = pipeline_output["explanation"]
 metrics_data = compute_framework_evaluation_metrics(processed_data)
+rec_signal = consensus.metadata.get("recommendation", "HOLD")
+
+agent_by_name = {result.agent_name: result for result in results}
+forecast_result = agent_by_name.get(AgentName.FORECASTING.value)
+esg_result = agent_by_name.get(AgentName.ESG.value)
+risk_result = agent_by_name.get(AgentName.RISK.value)
+rag_result = agent_by_name.get(AgentName.RAG.value)
+assistant_context = {
+    "ticker": ticker,
+    "recommendation": rec_signal,
+    "score": consensus.score,
+    "confidence": consensus.confidence,
+    "agents": results,
+    "forecast": forecast_result.metadata if forecast_result else {},
+    "esg": esg_result.metadata if esg_result else {},
+    "risk": risk_result.metadata if risk_result else {},
+    "rag_evidence": rag_result.evidence if rag_result else [],
+}
 
 # Save one prediction per explicit analysis run, rather than on every Streamlit rerun.
-rec_signal = consensus.metadata.get("recommendation", "HOLD")
 run_key = f"{ticker}:{start_date}:{end_date}:{rec_signal}:{round(consensus.score, 4)}"
 if st.session_state.get("last_logged_run") != run_key:
     db.log_prediction(ticker, rec_signal, consensus.score, consensus.confidence, explanation.evidence[0])
@@ -250,6 +268,28 @@ m4.metric("RSI (14)", f"{latest_row['RSI']:.1f}")
 m5.metric("Database Entries", sum(db.get_all_table_counts().values()))
 
 st.markdown("---")
+
+if "assistant_messages" not in st.session_state:
+    st.session_state.assistant_messages = [{
+        "role": "assistant",
+        "content": (
+            f"Hello. I am your Stock AI Assistant for {ticker}. Ask me why the recommendation was made, "
+            "what the ESG score means, how risk was calculated, what evidence RAG retrieved, or how to use the dashboard."
+        ),
+    }]
+
+st.subheader("🤖 Stock AI Assistant")
+st.caption("Ask questions about this analysis. Answers are based on the current dashboard run and are for decision support, not financial advice.")
+for message in st.session_state.assistant_messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+user_question = st.chat_input("Ask about the recommendation, ESG, risk, forecast, evidence, or dashboard...")
+if user_question:
+    st.session_state.assistant_messages.append({"role": "user", "content": user_question})
+    answer = answer_user_question(user_question, assistant_context)
+    st.session_state.assistant_messages.append({"role": "assistant", "content": answer})
+    st.rerun()
 
 # Main 7-Stage Workflow Tabs + Database Tab
 tabs = st.tabs([
