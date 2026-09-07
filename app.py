@@ -28,7 +28,7 @@ if str(PROJECT_DIR) not in sys.path:
     sys.path.insert(0, str(PROJECT_DIR))
 
 from config import RAW_DATA_DIR, MODEL_BENCHMARKS
-from data_collector import get_stock_data
+from data_collector import get_stock_data, get_latest_market_data
 from agents.orchestrator import MultiAgentOrchestrator
 from technical import compute_technical_indicators
 from evaluation import compute_framework_evaluation_metrics, compute_model_comparison, compute_ablation_study, compute_backtest_results
@@ -112,11 +112,17 @@ def get_db():
 
 db = get_db()
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_market_data(ticker: str, start: str, end: str) -> pd.DataFrame:
     df = get_stock_data(ticker, start, end, save_raw=True)
     db.insert_stock_data(ticker, df)
     return df
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def load_latest_market_data(ticker: str) -> dict:
+    """Cache only the latest market observation briefly; history remains separate."""
+    return get_latest_market_data(ticker)
 
 
 # Initialize Session State
@@ -159,6 +165,13 @@ with st.sidebar:
         start_date = st.date_input("Start Date", value=date.today() - timedelta(days=365 * 5))
     with col_e:
         end_date = st.date_input("End Date", value=date.today())
+
+    refresh_market_data = st.button("🔄 Refresh Market Data", use_container_width=True)
+    if refresh_market_data:
+        load_market_data.clear()
+        load_latest_market_data.clear()
+        st.session_state.pop("analysis_data", None)
+        st.rerun()
         
     st.subheader("⚖️ Decision Weights")
     w_forecast = st.slider("Market Forecast Weight", 0.0, 1.0, 0.25, 0.05)
@@ -187,16 +200,36 @@ with st.sidebar:
     
     run_btn = st.button("🚀 Run Multi-Agent Framework", type="primary", use_container_width=True)
 
-if "analysis_data" not in st.session_state or run_btn:
+analysis_request_key = (ticker, start_date.isoformat(), end_date.isoformat())
+if st.session_state.get("analysis_request_key") != analysis_request_key or run_btn:
     try:
         with st.spinner(f"Collecting market data for {ticker}..."):
             df = load_market_data(ticker, start_date.isoformat(), end_date.isoformat())
             st.session_state.analysis_data = df
+            st.session_state.analysis_request_key = analysis_request_key
     except Exception as err:
         st.error(f"Error retrieving data for {ticker}: {err}")
         st.stop()
 
 df = st.session_state.analysis_data
+latest_market_data = load_latest_market_data(ticker)
+if not latest_market_data["ok"]:
+    previous_snapshot = st.session_state.get("last_latest_market_data")
+    if previous_snapshot and previous_snapshot.get("ticker") == ticker:
+        latest_market_data = {
+            **previous_snapshot,
+            "data_status": "Stale / API unavailable",
+            "market_status": "Latest successful observation",
+            "error": latest_market_data["error"],
+        }
+    else:
+        latest_market_data = {
+            **latest_market_data,
+            "data_status": "API unavailable; historical data only",
+        }
+else:
+    st.session_state.last_latest_market_data = latest_market_data
+
 processed_data = compute_technical_indicators(df).dropna(subset=["SMA 50", "RSI"]).reset_index(drop=True)
 
 if len(processed_data) < 2:
@@ -261,12 +294,18 @@ if st.session_state.get("last_logged_run") != run_key:
     st.session_state.last_logged_run = run_key
 
 latest_row = processed_data.iloc[-1]
-prev_row = processed_data.iloc[-2]
-price_change_pct = (latest_row["Close"] / prev_row["Close"] - 1) * 100
+observed_price = latest_market_data.get("latest_observed_price")
+if observed_price is None:
+    observed_price = float(latest_row["Close"])
+    observed_price_label = "Historical fallback"
+    observed_change_percent = None
+else:
+    observed_price_label = "Latest available market data"
+    observed_change_percent = latest_market_data.get("price_change_percent")
 
 # Top Overview Metrics
 m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Latest Price", f"₹{latest_row['Close']:,.2f}", f"{price_change_pct:+.2f}%")
+m1.metric("Latest Price", f"₹{observed_price:,.2f}", f"{observed_change_percent:+.2f}%" if observed_change_percent is not None else None)
 m2.metric("Consensus Signal", rec_signal)
 m3.metric("Confidence Score", f"{consensus.confidence:.0%}")
 m4.metric("RSI (14)", f"{latest_row['RSI']:.1f}")
@@ -276,6 +315,14 @@ st.caption(
     f"Regime confidence: {regime_data.get('confidence', 0.0):.0%} | "
     f"Volatility: {regime_data.get('volatility', 0.0):.2%}"
 )
+st.caption(
+    f"Source: {latest_market_data.get('latest_price_source', 'Unknown')} | "
+    f"Data date: {latest_market_data.get('data_date') or 'Unavailable'} | "
+    f"Updated: {latest_market_data.get('latest_price_timestamp') or 'Unavailable'} | "
+    f"Status: {latest_market_data.get('data_status', 'Unknown')}"
+)
+if latest_market_data.get("error"):
+    st.warning(f"Market data temporarily unavailable. {observed_price_label}: ₹{observed_price:,.2f}")
 
 st.markdown("---")
 
@@ -320,7 +367,7 @@ with tabs[0]:
     summary_cols = st.columns(4)
     summary_cols[0].metric("Trading days loaded", f"{len(df):,}")
     summary_cols[1].metric("Analysis days", f"{len(processed_data):,}")
-    summary_cols[2].metric("Latest close", f"₹{latest_row['Close']:,.2f}")
+    summary_cols[2].metric("Latest observed price", f"₹{observed_price:,.2f}")
     summary_cols[3].metric("Data source", df.attrs.get("data_source", "Local or cached data"))
     st.info("This is AI-generated investment decision support, not guaranteed financial advice. The system reads historical prices, ESG records, documents, and indicators, asks specialist agents for independent signals, and combines them into one recommendation.")
     st.caption(f"Dataset coverage: {df['Date'].min().date().isoformat()} to {df['Date'].max().date().isoformat()} | These dates come from the loaded rows.")

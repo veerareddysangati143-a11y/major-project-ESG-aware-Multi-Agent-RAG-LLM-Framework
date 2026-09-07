@@ -5,7 +5,7 @@ Tests downloading stock data via yfinance, cleaning, error handling, and return 
 
 import pytest
 import pandas as pd
-from data_collector import get_stock_data
+from data_collector import get_stock_data, get_latest_market_data
 
 
 def test_get_stock_data_valid_ticker():
@@ -37,6 +37,41 @@ def test_get_stock_data_invalid_dates():
     """Tests that start_date after end_date raises ValueError."""
     with pytest.raises(ValueError):
         get_stock_data("AAPL", "2023-05-01", "2023-01-01", save_raw=False)
+
+
+def test_latest_market_data_calculates_observed_change(monkeypatch):
+    import data_collector
+
+    dates = pd.date_range("2026-09-03", periods=2, freq="D")
+    history = pd.DataFrame({"Date": dates, "Close": [100.0, 105.0]})
+
+    class FakeTicker:
+        def history(self, **kwargs):
+            return history.set_index("Date")
+
+    monkeypatch.setattr(data_collector.yf, "Ticker", lambda ticker: FakeTicker())
+    result = get_latest_market_data("RELIANCE.NS")
+
+    assert result["ok"] is True
+    assert result["latest_observed_price"] == 105.0
+    assert result["previous_close"] == 100.0
+    assert result["price_change"] == 5.0
+    assert result["price_change_percent"] == 5.0
+
+
+def test_latest_market_data_reports_provider_failure(monkeypatch):
+    import data_collector
+
+    class BrokenTicker:
+        def history(self, **kwargs):
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(data_collector.yf, "Ticker", lambda ticker: BrokenTicker())
+    result = get_latest_market_data("RELIANCE.NS")
+
+    assert result["ok"] is False
+    assert result["data_status"] == "API unavailable"
+    assert result["latest_observed_price"] is None
 
 
 if __name__ == "__main__":

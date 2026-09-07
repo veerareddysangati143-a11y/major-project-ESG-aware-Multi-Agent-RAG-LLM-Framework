@@ -17,6 +17,66 @@ from utils.logger import setup_logger
 logger = setup_logger("data_collector")
 
 
+def get_latest_market_data(ticker: str) -> dict:
+    """Return the latest available observed Yahoo Finance price for a ticker.
+
+    This deliberately uses a short recent window and is separate from the
+    historical analysis loader. Daily history may be delayed or closed-market
+    data, so the response labels it as latest available rather than live.
+    """
+    ticker = ticker.strip().upper()
+    try:
+        history = yf.Ticker(ticker).history(period="5d", interval="1d", auto_adjust=False)
+        if history.empty:
+            raise ValueError("Yahoo Finance returned no recent observations")
+
+        history = history.reset_index()
+        date_column = "Datetime" if "Datetime" in history.columns else "Date"
+        history[date_column] = pd.to_datetime(history[date_column], utc=True).dt.tz_localize(None)
+        history = history.dropna(subset=["Close"]).sort_values(date_column).reset_index(drop=True)
+        if history.empty:
+            raise ValueError("Recent history contained no valid close values")
+
+        latest = history.iloc[-1]
+        previous = history.iloc[-2] if len(history) > 1 else None
+        latest_price = float(latest["Close"])
+        previous_close = float(previous["Close"]) if previous is not None else latest_price
+        price_change = latest_price - previous_close
+        price_change_percent = (price_change / previous_close * 100.0) if previous_close else 0.0
+        timestamp = pd.Timestamp(latest[date_column])
+
+        return {
+            "ok": True,
+            "ticker": ticker,
+            "latest_observed_price": latest_price,
+            "previous_close": previous_close,
+            "price_change": price_change,
+            "price_change_percent": price_change_percent,
+            "latest_price_timestamp": timestamp.isoformat(),
+            "data_date": timestamp.date().isoformat(),
+            "latest_price_source": "Yahoo Finance",
+            "market_status": "Latest available market data",
+            "data_status": "Latest available",
+            "error": None,
+        }
+    except Exception as error:
+        logger.warning(f"Latest market data unavailable for {ticker}: {error}")
+        return {
+            "ok": False,
+            "ticker": ticker,
+            "latest_observed_price": None,
+            "previous_close": None,
+            "price_change": None,
+            "price_change_percent": None,
+            "latest_price_timestamp": None,
+            "data_date": None,
+            "latest_price_source": "Yahoo Finance",
+            "market_status": "Unavailable",
+            "data_status": "API unavailable",
+            "error": str(error),
+        }
+
+
 def _load_local_candidate(path: Path) -> pd.DataFrame:
     """Read one local CSV and normalize its date column for range selection."""
     local_df = pd.read_csv(path)

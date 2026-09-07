@@ -50,7 +50,7 @@ def analyze(request: AnalysisRequest) -> Dict:
     try:
         # Keep cold-start health requests lightweight and load the pipeline only when used.
         from agents.orchestrator import MultiAgentOrchestrator
-        from data_collector import get_stock_data
+        from data_collector import get_stock_data, get_latest_market_data
         from technical import compute_technical_indicators
         from evaluation import compute_framework_evaluation_metrics, compute_model_comparison, compute_ablation_study, compute_backtest_results
 
@@ -60,6 +60,7 @@ def analyze(request: AnalysisRequest) -> Dict:
             request.end_date.isoformat(),
             save_raw=False,
         )
+        latest_market_data = get_latest_market_data(request.ticker)
         processed_data = compute_technical_indicators(raw_data).dropna(
             subset=["SMA 50", "RSI"]
         ).reset_index(drop=True)
@@ -90,6 +91,7 @@ def analyze(request: AnalysisRequest) -> Dict:
                 "source": raw_data.attrs.get("data_source", "market data"),
                 "latest_close": float(processed_data.iloc[-1]["Close"]),
             },
+            "latest_market_data": latest_market_data,
             "recommendation": consensus.metadata.get("recommendation", "HOLD"),
             "score": float(consensus.score),
             "confidence": float(consensus.confidence),
